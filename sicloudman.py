@@ -4,6 +4,7 @@
 
 import jinja2
 import ftplib
+import inspect
 import logging
 import datetime
 import configparser
@@ -11,7 +12,6 @@ import dataclasses
 from pathlib import Path
 from collections import namedtuple
 from types import SimpleNamespace
-from repoassist import _logger
 
 
 __author__ = 'Damian Pala'
@@ -32,11 +32,11 @@ client_name = {{client_name}}
 project_name = {{project_name}}
 """
 
+
 class SiCloudManError(Exception):
     def __init__(self, msg, logger):
         super().__init__(msg)
         self.logger = logger
-        
 
 class NameError(SiCloudManError):
     pass
@@ -68,7 +68,11 @@ def handle_ftplib_error(func):
         try:
             return func(*args, **kwargs)
         except ftplib.all_errors as e:
-            raise FtpError(f'Ftp error occured: {e}', _logger)
+            sign = inspect.signature(func)
+            arg_names = list(sign.parameters.keys())
+            passed = {k:v for k,v in zip(arg_names[:len(args)], args)}
+            self = passed['self']
+            raise FtpError(f'Ftp error occured: {e}', self._logger)
 
     return wrapper
 
@@ -81,11 +85,11 @@ class Credentials():
     main_bucket_path: str
     client_name: str = ''
     project_name: str = ''
-    
+
     @staticmethod
     def get_fields():
         return [field.name for field in dataclasses.fields(Credentials)]
-    
+
     @staticmethod
     def get_default_fields():
         return dir(Credentials)
@@ -99,7 +103,7 @@ class CloudManager():
     
     def __init__(self, artifacts_path, buckets_list, credentials_path=None, get_logger=None, cwd='.'):
         if not isinstance(buckets_list, list):
-            raise TypeError('buckets_list parameter must be a list!', _logger)
+            raise TypeError('buckets_list parameter must be a list!', self._logger)
         self.cwd = Path(cwd)
         self.artifacts_path = Path(artifacts_path) if Path(artifacts_path).is_absolute() else self.cwd / artifacts_path
         if credentials_path:
@@ -114,68 +118,64 @@ class CloudManager():
 
 
     @staticmethod
-    def touch_credentials(path, keywords=None):
+    def touch_credentials(path, keywords={}):
         file_path = Path(path) / CLOUD_CREDENTIALS_FILENAME
-        
-        if keywords:
-            rtemplate = jinja2.Environment(loader=jinja2.BaseLoader).from_string(CLOUD_CREDENTIALS_FILE_TEMPLATE)
-            final_content = rtemplate.render(keywords)
-        else:
-            final_content = CLOUD_CREDENTIALS_FILE_TEMPLATE
-        
+        rtemplate = jinja2.Environment(loader=jinja2.BaseLoader).from_string(CLOUD_CREDENTIALS_FILE_TEMPLATE)
+        final_content = rtemplate.render(keywords)
         file_path.write_text(final_content, 'utf-8')
+        
         return file_path
     
     
     @handle_ftplib_error
     def upload_to_cloud(self, prompt=True):
-        _logger.info('Upload files to the cloud server...')
+        self._logger.info('Upload files to the cloud server...')
         is_file_to_upload = False
         
-        for bucket in self.buckets_list:
-            files_to_upload = []
-            for keyword in bucket.keywords:
-                file = self.get_latest_file_with_keyword(self.artifacts_path, keyword)
-                if file:
-                    files_to_upload.append(file)
-                    
-            for file in files_to_upload:
-                if prompt:
-                    if not self._is_checkpoint_ok(__name__, f'Upload the {file} file?'):
-                        file = None
-
-                if file:
-                    is_file_to_upload = True
-                    with ftplib.FTP(self.credentials.server, 
-                                    self.credentials.username, 
-                                    self.credentials.password) as ftp_conn:
+        with ftplib.FTP(self.credentials.server, 
+                        self.credentials.username, 
+                        self.credentials.password) as ftp_conn:
+            for bucket in self.buckets_list:
+                files_to_upload = []
+                for keyword in bucket.keywords:
+                    file = self.get_latest_file_with_keyword(self.artifacts_path, keyword)
+                    if file:
+                        files_to_upload.append(file)
+                        
+                for file in files_to_upload:
+                    if prompt:
+                        if not self._is_checkpoint_ok(__name__, f'Upload the {file} file?'):
+                            file = None
+        
+                    if file:
+                        is_file_to_upload = True
                         self._create_buckets_tree(ftp_conn)
                         self._upload_file(ftp_conn, file, bucket.name)
                     
         if not is_file_to_upload:
-            _logger.info('No files to upload.')
+            self._logger.info('No files to upload.')
             
-    
+    # TODO: review rest of functions!!!
     @handle_ftplib_error
     def upload_file_to_cloud(self, file_path=None, bucket_name=None, prompt=True):
-        _logger.info('Upload specified file to the cloud server...')
+        self._logger.info('Upload specified file to the cloud server...')
 
         if prompt:
             file_path = (Path().cwd() / input('Enter file path: ')).resolve()
             bucket_name = input('Enter bucket name: ')
         else:
             if file_path is None:
-                raise ValueError('file_path cannnot be None', _logger)
+                raise ValueError('file_path cannnot be None', self._logger)
             if bucket_name is None:
-                raise ValueError('bucket_name cannnot be None', _logger)
+                raise ValueError('bucket_name cannnot be None', self._logger)
 
         file_path = Path(file_path)
         if not file_path.exists():
-            raise FileNotFoundError(f'File {file_path} not found!', _logger)
+            raise FileNotFoundError(f'File {file_path} not found!', self._logger)
 
         buckets_names_on_cloud = [bucket.name for bucket in self.buckets_list]
         if bucket_name not in buckets_names_on_cloud:
-            raise BucketNotFoundError(f'Bucket {file_path} not found on the cloud server!', _logger)
+            raise BucketNotFoundError(f'Bucket {file_path} not found on the cloud server!', self._logger)
 
         with ftplib.FTP(self.credentials.server, 
                         self.credentials.username, 
@@ -186,16 +186,16 @@ class CloudManager():
     
     @handle_ftplib_error
     def list_cloud(self):
-        _logger.info('List cloud buckets...')
+        self._logger.info('List cloud buckets...')
         
         with ftplib.FTP(self.credentials.server, 
                         self.credentials.username, 
                         self.credentials.password) as ftp_conn:
             project_bucket_path = self._get_project_bucket_path()
             if not self._is_path_exists(ftp_conn, project_bucket_path):
-                _logger.info('There are no buckets on the cloud server.')
+                self._logger.info('There are no buckets on the cloud server.')
             else:
-                _logger.info(f'List buckets in project path: {project_bucket_path}')
+                self._logger.info(f'List buckets in project path: {project_bucket_path}')
                 cloud_files = SimpleNamespace()
                 for bucket in self.buckets_list:
                     bucket_files = self._print_bucket_files(ftp_conn, project_bucket_path, bucket.name)
@@ -203,6 +203,55 @@ class CloudManager():
                     
                 return cloud_files
             
+        return None
+
+
+    @handle_ftplib_error
+    def download_file(self, filename=None):
+        if not filename:
+            filename = input('Enter the name of a file to download: ')
+            
+        bucket_name = self._get_bucket_name_from_filename(filename)
+        if bucket_name is None:
+            raise FileNotFoundError('File not found on the cloud server. Bucket not found!', self._logger)
+            
+        with ftplib.FTP(self.credentials.server, 
+                self.credentials.username, 
+                self.credentials.password) as ftp_conn:
+            file_dir = self._get_project_bucket_path() / bucket_name
+            if not self._is_path_exists(ftp_conn, file_dir):
+                raise FileNotFoundError('File not found on the cloud server!', self._logger)
+            
+            ftp_conn.cwd(file_dir.as_posix())
+            if filename not in ftp_conn.nlst():
+                raise FileNotFoundError('File not found on the cloud server!', self._logger)
+    
+            dir_where_to_download = self.artifacts_path
+            if not dir_where_to_download.exists():
+                Path.mkdir(dir_where_to_download, parents=True)
+    
+            path_where_to_download = dir_where_to_download / filename
+    
+            if (path_where_to_download).exists():
+                self._logger.warning(f'File {filename} already exists in {path_where_to_download.parent}.')
+                self._logger.info('Downloading aborted.')
+                return
+    
+            with open(path_where_to_download, 'wb') as file:
+                ftp_conn.retrbinary('RETR ' + filename, file.write)
+    
+        if (path_where_to_download).exists():
+            self._logger.info(f'File {filename} downloding to {path_where_to_download.parent} directory completeted.')
+        else:
+            raise FileNotFoundError(f'File {filename} downloading error! Please try again.', self._logger)
+
+    
+    def _get_bucket_name_from_filename(self, filename):
+        for bucket in self.buckets_list:
+            for keyword in bucket.keywords:
+                if keyword in filename:
+                    return bucket.name
+        
         return None
 
 
@@ -231,11 +280,11 @@ class CloudManager():
             with open(file_path, 'rb') as file:
                 ftp_conn.storbinary('STOR ' + file_path.name, file)
             if file_path.name in ftp_conn.nlst():
-                _logger.info(f'File {file_path.name} uploaded properly to bucket {ftp_conn.pwd()}!')
+                self._logger.info(f'File {file_path.name} uploaded properly to bucket {ftp_conn.pwd()}!')
             else:
-                _logger.info(f'File {file_path.name} uploading error!')
+                self._logger.info(f'File {file_path.name} uploading error!')
         else:
-            _logger.info(f"{file_path.name} already exists in servers bucket: {ftp_conn.pwd()}.")
+            self._logger.info(f"{file_path.name} already exists in servers bucket: {ftp_conn.pwd()}.")
 
 
     # add header ror
@@ -246,11 +295,11 @@ class CloudManager():
             ftp_conn.cwd(bucket)
             bucket_files = sorted(list(ftp_conn.mlsd()), key=lambda k: k[1]['modify'])
             if bucket_files:
-                _logger.info(f'The {bucket} bucket files:')
+                self._logger.info(f'The {bucket} bucket files:')
                 files_list = []
                 for file in bucket_files:
                     files_list.append(file[0])
-                    _logger.info('{0:10} {1:10} {2} {3}'.format(file[1]['unix.owner'],
+                    self._logger.info('{0:10} {1:10} {2} {3}'.format(file[1]['unix.owner'],
                                                                 file[1]['size'],
                                                                 datetime.datetime.strptime(file[1]['modify'],
                                                                                            '%Y%m%d%H%M%S'),
@@ -258,9 +307,9 @@ class CloudManager():
                 
                 return files_list
             else:
-                _logger.info(f'No files in bucket: {bucket}')
+                self._logger.info(f'No files in bucket: {bucket}')
         else:
-            _logger.warning(f'Bucket: {bucket} not exists on cloud server.')
+            self._logger.warning(f'Bucket: {bucket} not exists on cloud server.')
             
         return []
 
@@ -268,7 +317,7 @@ class CloudManager():
     def _read_cloud_credentials(self):
         if not self.credentials_path.exists():
             print(self.credentials_path)
-            raise FileNotFoundError(f'{self.credentials_path} file not found!', _logger)
+            raise FileNotFoundError(f'{self.credentials_path} file not found!', self._logger)
 
         properties_string = f'[dummy_section]\n{self.credentials_path.read_text()}'
 
@@ -279,7 +328,7 @@ class CloudManager():
 
         for field, value in credentials_dict.items():
             if field not in Credentials.get_default_fields() and not value:
-                raise CredentialsError(f'{field} field is empty in {self.credentials_path.name} file!', _logger)
+                raise CredentialsError(f'{field} field is empty in {self.credentials_path.name} file!', self._logger)
 
         return SimpleNamespace(**credentials_dict)
 
@@ -307,7 +356,7 @@ class CloudManager():
             if self.get_ftp_errorcode(e) == 550:
                 return False
             else:
-                raise RuntimeError(f'Unknown error occured: {e}', _logger)
+                raise RuntimeError(f'Unknown error occured: {e}', self._logger)
         else:
             return True
 
@@ -319,23 +368,23 @@ class CloudManager():
         main_bucket_path = self._get_main_bucket_path_from_project_path(project_bucket_path)
         if not self._is_path_exists(ftp_conn, main_bucket_path):
             raise BucketNotFoudError(f'Bucket {main_bucket_path} not found on server! '
-                                     'Create it and try again.', _logger)
+                                     'Create it and try again.', self._logger)
 
         path_parents = list(Path(project_bucket_path).parents)
         for parent in reversed(path_parents):
             if not self._is_path_exists(ftp_conn, parent):
                 ftp_conn.mkd(parent.as_posix())
-                _logger.info(f'Bucket {parent.as_posix()} created.')
+                self._logger.info(f'Bucket {parent.as_posix()} created.')
         
         if not self._is_path_exists(ftp_conn, project_bucket_path):
             ftp_conn.mkd(project_bucket_path.as_posix())
-            _logger.info(f'Bucket {project_bucket_path.as_posix()} created.')
+            self._logger.info(f'Bucket {project_bucket_path.as_posix()} created.')
         
         for bucket in self.buckets_list:
             ftp_conn.cwd(project_bucket_path.as_posix())
             if not self._is_path_exists(ftp_conn, project_bucket_path / bucket.name):
                 ftp_conn.mkd(bucket.name)
-                _logger.info(f'Bucket {bucket.name} created.')
+                self._logger.info(f'Bucket {bucket.name} created.')
 
 
     @staticmethod
@@ -361,43 +410,3 @@ class CloudManager():
             choices_string += f'{choice}/'
             
         return choices_string[:-1]
-    
-    
-
-def download_package(cwd='.', package_name=None):
-    if not package_name:
-        package_name = input('Enter the name of the package to donwload: ')
-    if settings.RELEASE_PACKAGE_SUFFIX in package_name:
-        bucket = settings.DirName.RELEASE
-    else:
-        raise NameError('Incorrect package name!', logger=_logger)
-
-    credentials = _read_cloud_credentials(cwd)
-    cloud_project_bucket_path = _get_cloud_project_bucket_path(credentials)
-
-    with ftplib.FTP(credentials['server'], credentials['username'], credentials['password']) as ftp_conn:
-        ftp_conn.cwd(cloud_project_bucket_path)
-        ftp_conn.cwd(bucket)
-        if package_name not in ftp_conn.nlst():
-            raise FileNotFoundError(
-                f'{package_name} package not found on the cloud server', logger=_logger)
-
-        dir_where_to_download = Path(cwd) / settings.DirName.RELEASE
-        if not dir_where_to_download.exists():
-            Path.mkdir(dir_where_to_download, parents=True)
-
-        path_where_to_download = dir_where_to_download / package_name
-
-        if (path_where_to_download).exists():
-            _logger.warning(f'File {package_name} already exists in {path_where_to_download.parent}.')
-            _logger.info('Downloading aborted.')
-            return
-
-        with open(path_where_to_download, 'wb') as file:
-            ftp_conn.retrbinary('RETR ' + package_name, file.write)
-
-    if (path_where_to_download).exists():
-        _logger.info(f'File {package_name} downloding to {path_where_to_download.parent} directory completeted.')
-    else:
-        raise FileNotFoundError(f'File {package_name} downloading error! Please try again.', _logger)
-

@@ -5,6 +5,9 @@
 - mlsd server required
 - check if file is uploeaded properly feature
 - upload specified file to specified bucket
+- file name cannot containt keywords from different buckets
+- check if file downloaded is actually in download dir
+- buckets configured in CLoudManager are only valid. Additional buckets from server are omitted.
 
 ## List Cloud
 - list all of bucket on server
