@@ -6,6 +6,14 @@ To communicate with a server Sicloudman uses FTP connection. Credentials used in
 
 Sicloudman is intended to use only as a python module.
 
+## Requirements
+
+Python >= 3.7
+
+Account on FTP server with read and write access
+
+
+
 ## Convention
 
 Sicloudman has 3 basic features:
@@ -25,9 +33,15 @@ Only a latest created file belonging to the given project configuration - bucket
 
 To upload artifacts use `upload_artifacts` function.
 
+When uploading process is finished the existence of uploaded files is finally confirmed.
+
+> Buckets configured during initialization are only ones that are relevant. If there are other buckets in the specified server location they will not be taken into account.
+
 #### File distunguishing
 
 The process of distinguishing which file belongs to which bucket is based on the file name. During initialization of `CloudManager` class you have to specify a list of `Buckets`. `Bucket` object has two properties: `name` and `keywords`. When `upload_artifacts` function is called, artifacts are scanned and proper files are selected when their name contains keyword from `keywords` parameter of given bucket. Only latest created file are uploaded to the cloud server.
+
+> One file can be uploaded to many buckets. To achieve this add keywords to the file name that belongs to many buckets.
 
 ### Upload Specified File
 
@@ -41,16 +55,27 @@ All files from all buckets can be listed from your cloud sever using `list_cloud
 
 Using `download_file` function you can download specified file by name to your artifacts location.
 
+> If a file already exists on server it will not be overwritten and proper warning will be printed.
+>
+> If the same file is stored in many buckets it will be downloaded from the first matched bucket.
+
+### File Removal
+
+There are no way to remove already uploaded files. This is deliberately implementation to protect the cloud from unintended deletion of archival files. When you want to remove a file, you should do it manually using other tool.
+
+
+
 ## Configuration
 
-Main configuration is injected during initialization of `CloudManager`. It contains parameters:
+Main configuration is injected during initialization of `CloudManager`. Initialization parameters are:
 
 - `artifacts_path` - path where files to upload are seek
 - `buckets_list` - list of used buckets
-- `credentials_path` - path where `cloud_credentials.txt` file is stored. By default this file is searched in current working directory.
-- `get_logger` - function that returns logger object.
+- `credentials_path` - path where `cloud_credentials.txt` file is stored. By default this file is searched in current working directory (optional parameter).
+- `credentials` - object of `Credentials` class (optional parameter).
+- `get_logger` - function that returns logger object (optional parameter).
 
-The rest of configuration is stored in `cloud_credentials.txt` file.
+The rest of configuration is stored in `cloud_credentials.txt` file or can be injected via `credentials` parameter.
 
 ### cloud_credentials.txt
 
@@ -77,39 +102,30 @@ Only `main_bucket_path` path is mandatory.
 
 > `main_bucket_path`  must contain parent directory e.g. `main_bucket_path = /fw_cloud` . Cannot be root('/'). If only parent directory is exists the rest directory will be created.
 
+#### How to create cloud_credentials.txt file
 
+The `cloud_credentials.txt` file can be easily created using `touch_credentials` function.
 
-TODO: credentials file can be touched!
+Another way is to prepare from the following template:
 
+```
+# This file must not be commited! It contains confidentials.
+server = 
+username = 
+password = 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-#### File Removal
-
-There are no way to remove already uploaded files. This is deliberately implementation to protected the cloud from unintended deletion of archival files. When you want to remove a files, you should do it manually using other tool.
-
-
+# Path when you store files
+# Final Path will be: <main_bucket_path>/<client_name>/<project_name>
+main_bucket_path = 
+# Leave empty if not attached to final path
+client_name = 
+# Leave empty if not attached to final path
+project_name = 
+```
 
 
 
-
-
-
-
-
-
-
+## Features
 
 
 
@@ -122,8 +138,3 @@ There are no way to remove already uploaded files. This is deliberately implemen
 # Assumptions
 
 - mlsd server required
-- check if file is uploeaded properly feature
-- upload specified file to specified bucket
-- file name cannot containt keywords from different buckets
-- check if file downloaded is actually in download dir
-- buckets configured in CLoudManager are only valid. Additional buckets from server are omitted.
