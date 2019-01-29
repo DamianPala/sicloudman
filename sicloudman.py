@@ -56,9 +56,6 @@ class BucketNotFoundError(SiCloudManError):
 class CredentialsError(SiCloudManError):
     pass
 
-class BucketNotFoudError(SiCloudManError):
-    pass
-
 class FtpError(SiCloudManError):
     pass
 
@@ -128,7 +125,7 @@ class CloudManager():
     
     
     @handle_ftplib_error
-    def upload_to_cloud(self, prompt=True):
+    def upload_artifacts(self, prompt=True):
         self._logger.info('Upload files to the cloud server...')
         is_file_to_upload = False
         
@@ -150,14 +147,15 @@ class CloudManager():
                     if file:
                         is_file_to_upload = True
                         self._create_buckets_tree(ftp_conn)
-                        self._upload_file(ftp_conn, file, bucket.name)
+                        self._upload_file_to_bucket(ftp_conn, file, bucket.name)
                     
         if not is_file_to_upload:
             self._logger.info('No files to upload.')
             
     # TODO: review rest of functions!!!
+    # TODO: add test where file already exists in server
     @handle_ftplib_error
-    def upload_file_to_cloud(self, file_path=None, bucket_name=None, prompt=True):
+    def upload_file(self, file_path=None, bucket_name=None, prompt=True):
         self._logger.info('Upload specified file to the cloud server...')
 
         if prompt:
@@ -181,7 +179,7 @@ class CloudManager():
                         self.credentials.username, 
                         self.credentials.password) as ftp_conn:
             self._create_buckets_tree(ftp_conn)
-            self._upload_file(ftp_conn, file_path, bucket_name)
+            self._upload_file_to_bucket(ftp_conn, file_path, bucket_name)
 
     
     @handle_ftplib_error
@@ -272,9 +270,8 @@ class CloudManager():
 
     
     @handle_ftplib_error
-    def _upload_file(self, ftp_conn, file_path, bucket_name):
+    def _upload_file_to_bucket(self, ftp_conn, file_path, bucket_name):
         ftp_conn.cwd((self._get_project_bucket_path() / bucket_name).as_posix())
-        
         buckets_contents = ftp_conn.nlst()
         if file_path.name not in buckets_contents:
             with open(file_path, 'rb') as file:
@@ -284,7 +281,7 @@ class CloudManager():
             else:
                 self._logger.info(f'File {file_path.name} uploading error!')
         else:
-            self._logger.info(f"{file_path.name} already exists in servers bucket: {ftp_conn.pwd()}.")
+            self._logger.info(f"{file_path.name} already exists in server bucket: {ftp_conn.pwd()}.")
 
 
     # add header ror
@@ -329,6 +326,9 @@ class CloudManager():
         for field, value in credentials_dict.items():
             if field not in Credentials.get_default_fields() and not value:
                 raise CredentialsError(f'{field} field is empty in {self.credentials_path.name} file!', self._logger)
+            elif field == 'main_bucket_path' and value == '/':
+                raise CredentialsError(f'{field} field has invalid value {value} '
+                                       'in {self.credentials_path.name} file!', self._logger)
 
         return SimpleNamespace(**credentials_dict)
 
@@ -344,8 +344,9 @@ class CloudManager():
     
     
     @staticmethod
-    def _get_main_bucket_path_from_project_path(path):
-        return list(Path(path).parents)[1]
+    def _get_main_bucket_first_dir(path):
+        parents = list(Path(path).parents)
+        return parents[-2] if parents.__len__() > 1 else Path(path)
 
     
     @handle_ftplib_error
@@ -365,9 +366,9 @@ class CloudManager():
     def _create_buckets_tree(self, ftp_conn):
         ftp_conn.cwd('/')
         project_bucket_path = self._get_project_bucket_path()
-        main_bucket_path = self._get_main_bucket_path_from_project_path(project_bucket_path)
-        if not self._is_path_exists(ftp_conn, main_bucket_path):
-            raise BucketNotFoudError(f'Bucket {main_bucket_path} not found on server! '
+        main_bucket_first_dir = self._get_main_bucket_first_dir(self.credentials.main_bucket_path)
+        if not self._is_path_exists(ftp_conn, main_bucket_first_dir):
+            raise BucketNotFoundError(f'Directory {main_bucket_first_dir.as_posix()} not found on server! '
                                      'Create it and try again.', self._logger)
 
         path_parents = list(Path(project_bucket_path).parents)

@@ -167,6 +167,22 @@ def test_read_credentials_SHOULD_rise_error_when_mandatory_field_empty(cwd):
 
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
+def test_read_credentials_SHOULD_rise_error_when_field_has_invalid_value(cwd):
+    credentials_expected = sicloudman.Credentials(
+        server='',
+        username='user',
+        password='pass',
+        main_bucket_path='/',
+        client_name='client',
+        project_name='project',
+    )
+    sicloudman.CloudManager.touch_credentials(cwd, keywords=credentials_expected.__dict__)
+    
+    with pytest.raises(sicloudman.CredentialsError): 
+        sicloudman.CloudManager('artifacts', [sicloudman.Bucket(name='release', keywords=['_release'])], cwd=cwd)
+
+
+@pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
 def test_read_credentials_SHOULD_not_rise_error_when_extra_field_empty(cwd):
     credentials_expected = sicloudman.Credentials(
         server='my_server',
@@ -265,18 +281,20 @@ def test_get_project_bucket_path(credentials, expected_path, cwd):
     assert path == expected_path
 
 
-get_main_bucket_path_from_project_path_testdata = [
+get_main_bucket_first_dir_testdata = [
+    ('/main_bucket', '/main_bucket'),
     ('/main_bucket/client/project', '/main_bucket'),
-    ('/dir1/main_bucket/client/project', '/dir1/main_bucket'),
-    ('/dir1/dir2/main_bucket/client/project', '/dir1/dir2/main_bucket'),
+    ('/dir1/main_bucket/client/project', '/dir1'),
+    ('/dir1/dir2/main_bucket/client/project', '/dir1'),
+    ('/dir1/dir2/main_bucket/project', '/dir1'),
 ]
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
-@pytest.mark.parametrize("project_path, main_pucket_path", get_main_bucket_path_from_project_path_testdata)
-def test_get_main_bucket_path_from_project_path(project_path, main_pucket_path, cwd):
-    path = sicloudman.CloudManager._get_main_bucket_path_from_project_path(project_path).as_posix()
+@pytest.mark.parametrize("main_pucket_path, first_dir", get_main_bucket_first_dir_testdata)
+def test_get_main_bucket_first_dir(main_pucket_path, first_dir, cwd):
+    path = sicloudman.CloudManager._get_main_bucket_first_dir(main_pucket_path).as_posix()
     
-    assert path == main_pucket_path
+    assert path == first_dir
 
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
@@ -351,7 +369,7 @@ def get_updated_cloud_manager(cwd, bucket_paths, buckets):
     cloud_manager = sicloudman.CloudManager(artifacts_path, buckets, cwd=cwd)
     
     with ftplib.FTP(cloud_manager.credentials.server, cloud_manager.credentials.username, cloud_manager.credentials.password) as ftp_conn:
-        main_bucket_path = cloud_manager._get_main_bucket_path_from_project_path(cloud_manager._get_project_bucket_path())
+        main_bucket_path = cloud_manager.credentials.main_bucket_path
         if main_bucket_path == cloud_manager._get_project_bucket_path().parent:
             path_to_rm = cloud_manager._get_project_bucket_path()
         else:
@@ -363,7 +381,7 @@ def get_updated_cloud_manager(cwd, bucket_paths, buckets):
 
     
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
-def test_create_buckets_tree(cwd):
+def test_create_buckets_tree_SHOULD_create_tree_properly_when_simple_main_bucket_path(cwd):
     bucket_paths = SimpleNamespace(
         main_bucket_path='fw_cloud',
         client_name='sicloudman_client',
@@ -381,7 +399,40 @@ def test_create_buckets_tree(cwd):
 
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
-def test_upload_to_cloud_and_list_cloud_SHOULD_upload_files_to_buckets_properly_and_list(cwd):
+def test_create_buckets_tree_SHOULD_create_tree_properly_when_complex_main_bucket_path(cwd):
+    bucket_paths = SimpleNamespace(
+        main_bucket_path='fw_cloud/test_cloud',
+        client_name='sicloudman_client',
+        project_name='sicloudman_project')
+    cloud_manager, _ = get_updated_cloud_manager(cwd, bucket_paths,
+                                                 [sicloudman.Bucket(name='release', keywords=['_release']), 
+                                                  sicloudman.Bucket(name='client', keywords=['_client'])])
+    
+    with ftplib.FTP(cloud_manager.credentials.server, cloud_manager.credentials.username, cloud_manager.credentials.password) as ftp_conn:
+        cloud_manager._create_buckets_tree(ftp_conn)
+        assert cloud_manager._is_path_exists(ftp_conn, cloud_manager._get_project_bucket_path() / 'release') == True
+        assert cloud_manager._is_path_exists(ftp_conn, cloud_manager._get_project_bucket_path() / 'client') == True
+        
+        ftp_rmtree(ftp_conn, cloud_manager._get_project_bucket_path().parent.as_posix())
+        
+
+@pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
+def test_create_buckets_tree_SHOULD_raise_error_when_main_bucket_not_exists(cwd):
+    bucket_paths = SimpleNamespace(
+        main_bucket_path='main_bucket_dummy_dir',
+        client_name='sicloudman_client',
+        project_name='sicloudman_project')
+    cloud_manager, _ = get_updated_cloud_manager(cwd, bucket_paths,
+                                                 [sicloudman.Bucket(name='release', keywords=['_release']), 
+                                                  sicloudman.Bucket(name='client', keywords=['_client'])])
+    
+    with ftplib.FTP(cloud_manager.credentials.server, cloud_manager.credentials.username, cloud_manager.credentials.password) as ftp_conn:
+        with pytest.raises(sicloudman.BucketNotFoundError):
+            cloud_manager._create_buckets_tree(ftp_conn)
+        
+
+@pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
+def test_upload_artifacts_and_list_cloud_SHOULD_upload_files_to_buckets_properly_and_list(cwd):
     bucket_paths = SimpleNamespace(
         main_bucket_path='fw_cloud',
         client_name='sicloudman_client',
@@ -398,7 +449,7 @@ def test_upload_to_cloud_and_list_cloud_SHOULD_upload_files_to_buckets_properly_
     Path(artifacts_path / 'test_2_client.txt').touch()
     Path(artifacts_path / 'test_2_dev.txt').touch()
     
-    cloud_manager.upload_to_cloud(prompt=False)
+    cloud_manager.upload_artifacts(prompt=False)
     cloud_files = cloud_manager.list_cloud()
     
     assert set(cloud_files.release) == {'test_2_release.txt'}
@@ -411,7 +462,7 @@ def test_upload_to_cloud_and_list_cloud_SHOULD_upload_files_to_buckets_properly_
         
         
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
-def test_upload_to_cloud_SHOULD_upload_files_to_buckets_properly_WHEN_multiple_keywords(cwd):
+def test_upload_artifacts_SHOULD_upload_files_to_buckets_properly_WHEN_multiple_keywords(cwd):
     bucket_paths = SimpleNamespace(
         main_bucket_path='fw_cloud',
         client_name='sicloudman_client',
@@ -430,7 +481,7 @@ def test_upload_to_cloud_SHOULD_upload_files_to_buckets_properly_WHEN_multiple_k
     Path(artifacts_path / 'test_2_client.txt').touch()
     Path(artifacts_path / 'test_2_dev.txt').touch()
     
-    cloud_manager.upload_to_cloud(prompt=False)
+    cloud_manager.upload_artifacts(prompt=False)
     cloud_files = cloud_manager.list_cloud()
     
     assert set(cloud_files.release) == {'test_2_release.txt', 'test_2.whl'}
@@ -443,7 +494,7 @@ def test_upload_to_cloud_SHOULD_upload_files_to_buckets_properly_WHEN_multiple_k
 
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
-def test_upload_to_cloud_SHOULD_upload_files_to_buckets_properly_WHEN_multiple_uploads(cwd):
+def test_upload_artifacts_SHOULD_upload_files_to_buckets_properly_WHEN_multiple_uploads(cwd):
     bucket_paths = SimpleNamespace(
         main_bucket_path='fw_cloud',
         client_name='sicloudman_client',
@@ -462,7 +513,7 @@ def test_upload_to_cloud_SHOULD_upload_files_to_buckets_properly_WHEN_multiple_u
     Path(artifacts_path / 'test_2_client.txt').touch()
     Path(artifacts_path / 'test_2_dev.txt').touch()
     
-    cloud_manager.upload_to_cloud(prompt=False)
+    cloud_manager.upload_artifacts(prompt=False)
     cloud_files = cloud_manager.list_cloud()
     
     assert set(cloud_files.release) == {'test_2_release.txt', 'test_2.whl'}
@@ -475,7 +526,7 @@ def test_upload_to_cloud_SHOULD_upload_files_to_buckets_properly_WHEN_multiple_u
     Path(artifacts_path / 'test_3_client.txt').touch()
     Path(artifacts_path / 'test_3_dev.txt').touch()
     
-    cloud_manager.upload_to_cloud(prompt=False)
+    cloud_manager.upload_artifacts(prompt=False)
     cloud_files = cloud_manager.list_cloud()
     
     assert set(cloud_files.release) == {'test_2_release.txt', 'test_2.whl', 'test_3_release.txt', 'test_3.whl'}
@@ -488,7 +539,7 @@ def test_upload_to_cloud_SHOULD_upload_files_to_buckets_properly_WHEN_multiple_u
 
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
-def test_upload_to_cloud_SHOULD_not_upload_files_to_buckets_properly_WHEN_no_match_files(cwd, caplog):
+def test_upload_artifacts_SHOULD_not_upload_files_to_buckets_properly_WHEN_no_match_files(cwd, caplog):
     bucket_paths = SimpleNamespace(
         main_bucket_path='fw_cloud',
         client_name='sicloudman_client',
@@ -504,7 +555,7 @@ def test_upload_to_cloud_SHOULD_not_upload_files_to_buckets_properly_WHEN_no_mat
     Path(artifacts_path / 'test_2_dev.txt').touch()
     
     cloud_manager._logger.setLevel(logging.INFO)
-    cloud_manager.upload_to_cloud(prompt=False)
+    cloud_manager.upload_artifacts(prompt=False)
     cloud_files = cloud_manager.list_cloud()
     
     assert cloud_files is None
@@ -512,7 +563,7 @@ def test_upload_to_cloud_SHOULD_not_upload_files_to_buckets_properly_WHEN_no_mat
     
     
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
-def test_upload_file_to_cloud_SHOULD_upload_file_properly(cwd):
+def test_upload_file_SHOULD_upload_file_properly(cwd):
     bucket_paths = SimpleNamespace(
         main_bucket_path='fw_cloud',
         client_name='sicloudman_client',
@@ -524,7 +575,7 @@ def test_upload_file_to_cloud_SHOULD_upload_file_properly(cwd):
     Path(artifacts_path / 'test_1_release.txt').touch()
     Path(artifacts_path / 'test_1.whl').touch()
     
-    cloud_manager.upload_file_to_cloud(file_path=artifacts_path / 'test_1_release.txt', bucket_name='release', prompt=False)
+    cloud_manager.upload_file(file_path=artifacts_path / 'test_1_release.txt', bucket_name='release', prompt=False)
     cloud_files = cloud_manager.list_cloud()
     
     assert set(cloud_files.release) == {'test_1_release.txt'}
@@ -536,7 +587,7 @@ def test_upload_file_to_cloud_SHOULD_upload_file_properly(cwd):
 
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
-def test_upload_file_to_cloud_SHOULD_raise_error_when_file_path_not_specified(cwd):
+def test_upload_file_SHOULD_raise_error_when_file_path_not_specified(cwd):
     bucket_paths = SimpleNamespace(
         main_bucket_path='fw_cloud',
         client_name='sicloudman_client',
@@ -546,13 +597,13 @@ def test_upload_file_to_cloud_SHOULD_raise_error_when_file_path_not_specified(cw
                                                                sicloudman.Bucket(name='client', keywords=['_client'])])
     
     with pytest.raises(sicloudman.ValueError) as exc:
-        cloud_manager.upload_file_to_cloud(bucket_name='release', prompt=False)
+        cloud_manager.upload_file(bucket_name='release', prompt=False)
         
     assert 'file_path' in str(exc.value)
         
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
-def test_upload_file_to_cloud_SHOULD_raise_error_when_bucket_name_not_specified(cwd):
+def test_upload_file_SHOULD_raise_error_when_bucket_name_not_specified(cwd):
     bucket_paths = SimpleNamespace(
         main_bucket_path='fw_cloud',
         client_name='sicloudman_client',
@@ -562,13 +613,13 @@ def test_upload_file_to_cloud_SHOULD_raise_error_when_bucket_name_not_specified(
                                                                sicloudman.Bucket(name='client', keywords=['_client'])])
     
     with pytest.raises(sicloudman.ValueError) as exc:
-        cloud_manager.upload_file_to_cloud(file_path='file.txt', prompt=False)
+        cloud_manager.upload_file(file_path='file.txt', prompt=False)
         
     assert 'bucket_name' in str(exc.value)
     
     
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
-def test_upload_file_to_cloud_SHOULD_raise_error_when_file_not_exists(cwd):
+def test_upload_file_SHOULD_raise_error_when_file_not_exists(cwd):
     bucket_paths = SimpleNamespace(
         main_bucket_path='fw_cloud',
         client_name='sicloudman_client',
@@ -578,11 +629,11 @@ def test_upload_file_to_cloud_SHOULD_raise_error_when_file_not_exists(cwd):
                                                                sicloudman.Bucket(name='client', keywords=['_client'])])
     
     with pytest.raises(sicloudman.FileNotFoundError):
-        cloud_manager.upload_file_to_cloud(file_path='file.txt', bucket_name='release', prompt=False)
+        cloud_manager.upload_file(file_path='file.txt', bucket_name='release', prompt=False)
         
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
-def test_upload_file_to_cloud_SHOULD_raise_error_when_bucket_not_exists(cwd):
+def test_upload_file_SHOULD_raise_error_when_bucket_not_exists(cwd):
     bucket_paths = SimpleNamespace(
         main_bucket_path='fw_cloud',
         client_name='sicloudman_client',
@@ -594,7 +645,7 @@ def test_upload_file_to_cloud_SHOULD_raise_error_when_bucket_not_exists(cwd):
     Path(artifacts_path / 'test_1_release.txt').touch()
     
     with pytest.raises(sicloudman.BucketNotFoundError):
-        cloud_manager.upload_file_to_cloud(file_path=artifacts_path / 'test_1_release.txt', bucket_name='dummy_bucket', prompt=False)
+        cloud_manager.upload_file(file_path=artifacts_path / 'test_1_release.txt', bucket_name='dummy_bucket', prompt=False)
 
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
@@ -642,7 +693,7 @@ def test_download_file_SHOULD_download_file_properly(cwd):
     Path(artifacts_path / 'test_1_client.txt').touch()
     Path(artifacts_path / 'test_1_dev.txt').touch()
     
-    cloud_manager.upload_to_cloud(prompt=False)
+    cloud_manager.upload_artifacts(prompt=False)
     
     shutil.rmtree(artifacts_path)
 
@@ -670,7 +721,7 @@ def test_download_file_SHOULD_not_download_file_if_already_exists(cwd, caplog):
     Path(artifacts_path / 'test_1_dev.txt').touch()
     
     cloud_manager._logger.setLevel(logging.INFO)
-    cloud_manager.upload_to_cloud(prompt=False)
+    cloud_manager.upload_artifacts(prompt=False)
     
     cloud_manager.download_file(filename='test_1.whl')
     
@@ -702,7 +753,7 @@ def test_dummy(cwd):
                                                                sicloudman.Bucket(name='client', keywords=['_client'])])
     
     with ftplib.FTP(cloud_manager.credentials.server, cloud_manager.credentials.username, cloud_manager.credentials.password) as ftp_conn:
-        cloud_manager._upload_file(ftp_conn, 'file.txt', 'dummy_bucket')
+        cloud_manager._upload_file_to_bucket(ftp_conn, 'file.txt', 'dummy_bucket')
     
     
     assert 0
