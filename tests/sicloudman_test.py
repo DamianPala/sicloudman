@@ -454,6 +454,27 @@ def test_list_cloud_SHOULD_print_proper_info_when_no_buckets(cwd, caplog):
     cloud_manager.list_cloud()
     
     assert 'no buckets' in caplog.text
+
+
+@pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
+def test_list_cloud_SHOULD_print_that_bucket_is_empty_WHEN_bucket_empty(cwd, caplog):
+    bucket_paths = SimpleNamespace(
+        main_bucket_path='fw_cloud',
+        client_name='sicloudman_client',
+        project_name='sicloudman_project')
+    cloud_manager, artifacts_path = get_updated_cloud_manager(cwd, bucket_paths,
+                                                              [sicloudman.Bucket(name='release', keywords=['_release']), 
+                                                               sicloudman.Bucket(name='client', keywords=['_client'])])
+    
+    Path(artifacts_path / 'test_1_release.txt').touch()
+    Path(artifacts_path / 'test_1_dev.txt').touch()
+    
+    cloud_manager._logger.setLevel(logging.INFO)
+    cloud_manager.upload_artifacts(prompt=False)
+    cloud_manager.list_cloud()
+    
+    assert 'No files in bucket: client' in caplog.text
+    assert 0
         
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
@@ -847,6 +868,23 @@ def test_download_file_SHOULD_not_download_file_if_already_exists(cwd, caplog):
 
 
 
+@pytest.mark.skip()
+@pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
+def test_dummy2(cwd):
+    bucket_paths = SimpleNamespace(
+        main_bucket_path='fw_cloud',
+        client_name='sicloudman_client_dummy',
+        project_name='sicloudman_project')
+    cloud_manager, artifacts_path = get_updated_cloud_manager(cwd, bucket_paths,
+                                                              [sicloudman.Bucket(name='release', keywords=['_release', '.whl']), 
+                                                               sicloudman.Bucket(name='client', keywords=['_client'])])
+
+    
+#     with ftplib.FTP(cloud_manager.credentials.server, cloud_manager.credentials.username, cloud_manager.credentials.password) as ftp_conn:
+#         pprint(ftp_conn.retrlines('FEAT'))
+    
+    
+    assert 0
 
 
 @pytest.mark.skip()
