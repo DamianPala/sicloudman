@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""To run tests you have to fill the cloud_credentials.txt file with 
+relevant data regarding for instance your server.
+
+Tests need ftp account on a server.
+
+"""
 
 
 import sys
@@ -18,9 +24,9 @@ from types import SimpleNamespace
 import sicloudman
 
 
-RUN_ALL_TESTS = False
+RUN_ALL_TESTS = True
 
-TEST_CLOUD_CREDENTIALS_PATH = Path(__file__) / '../..' / sicloudman.CLOUD_CREDENTIALS_FILENAME
+TEST_CLOUD_CREDENTIALS_PATH = Path(__file__).parent / '..' / sicloudman.CLOUD_CREDENTIALS_FILENAME
 
 
 def _error_remove_readonly(_action, name, _exc):
@@ -57,7 +63,7 @@ def cwd():
         print(f'Tests workspace path: {workspace_path}')
     else:
         shutil.rmtree(workspace_path, ignore_errors=False, onerror=_error_remove_readonly)
-        
+
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
 def test_get_latest_file_with_keyword_SHOULD_return_none_if_path_not_exists():
@@ -474,7 +480,6 @@ def test_list_cloud_SHOULD_print_that_bucket_is_empty_WHEN_bucket_empty(cwd, cap
     cloud_manager.list_cloud()
     
     assert 'No files in bucket: client' in caplog.text
-    assert 0
         
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
@@ -859,47 +864,3 @@ def test_download_file_SHOULD_not_download_file_if_already_exists(cwd, caplog):
     
     with ftplib.FTP(cloud_manager.credentials.server, cloud_manager.credentials.username, cloud_manager.credentials.password) as ftp_conn:
         ftp_rmtree(ftp_conn, cloud_manager._get_project_bucket_path().parent.as_posix())
-
-
-
-
-
-
-
-
-
-@pytest.mark.skip()
-@pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
-def test_dummy2(cwd):
-    bucket_paths = SimpleNamespace(
-        main_bucket_path='fw_cloud',
-        client_name='sicloudman_client_dummy',
-        project_name='sicloudman_project')
-    cloud_manager, artifacts_path = get_updated_cloud_manager(cwd, bucket_paths,
-                                                              [sicloudman.Bucket(name='release', keywords=['_release', '.whl']), 
-                                                               sicloudman.Bucket(name='client', keywords=['_client'])])
-
-    
-#     with ftplib.FTP(cloud_manager.credentials.server, cloud_manager.credentials.username, cloud_manager.credentials.password) as ftp_conn:
-#         pprint(ftp_conn.retrlines('FEAT'))
-    
-    
-    assert 0
-
-
-@pytest.mark.skip()
-@pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
-def test_dummy(cwd):
-    bucket_paths = SimpleNamespace(
-        main_bucket_path='fw_cloud',
-        client_name='sicloudman_client',
-        project_name='sicloudman_project')
-    cloud_manager, artifacts_path = get_updated_cloud_manager(cwd, bucket_paths,
-                                                              [sicloudman.Bucket(name='release', keywords=['_release']), 
-                                                               sicloudman.Bucket(name='client', keywords=['_client'])])
-    
-    with ftplib.FTP(cloud_manager.credentials.server, cloud_manager.credentials.username, cloud_manager.credentials.password) as ftp_conn:
-        cloud_manager._upload_file_to_bucket(ftp_conn, 'file.txt', 'dummy_bucket')
-    
-    
-    assert 0

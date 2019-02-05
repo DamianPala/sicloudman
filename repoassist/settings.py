@@ -111,6 +111,7 @@ class FileName():
     CLOUD_CREDENTIALS = 'cloud_credentials.txt'
     REQUIREMENTS = 'requirements.txt'
     REQUIREMENTS_DEV = 'requirements-dev.txt'
+    REPOASSIST_README = 'REPOASSIST_README.md'
 
 
 class Tools():
@@ -247,17 +248,19 @@ REPOASSIST_FILES = [
     RepoassistFileGenEntry(src=Path(FileName.CLEAN), dst=Path('.') / DirName.REPOASSIST / FileName.CLEAN, is_templ=False),
     RepoassistFileGenEntry(src=Path(FileName.REPOASSIST_CLI), dst=Path('.') / DirName.REPOASSIST / FileName.CLI, is_templ=False),
     RepoassistFileGenEntry(src=Path(DirName.TEMPLATES) / f'{FileName.CHANGELOG_GENERATED}{JINJA2_TEMPLATE_EXT}', 
-                           dst=Path('.') / DirName.REPOASSIST  / DirName.TEMPLATES / f'{FileName.CHANGELOG_GENERATED}{JINJA2_TEMPLATE_EXT}', 
+                           dst=Path('.') / DirName.REPOASSIST / DirName.TEMPLATES / f'{FileName.CHANGELOG_GENERATED}{JINJA2_TEMPLATE_EXT}', 
                            is_templ=False),
     RepoassistFileGenEntry(src=Path(DirName.TEMPLATES) / f'{FileName.CHANGELOG_PREPARED}{JINJA2_TEMPLATE_EXT}', 
-                           dst=Path('.') / DirName.REPOASSIST  / DirName.TEMPLATES / f'{FileName.CHANGELOG_PREPARED}{JINJA2_TEMPLATE_EXT}', 
+                           dst=Path('.') / DirName.REPOASSIST / DirName.TEMPLATES / f'{FileName.CHANGELOG_PREPARED}{JINJA2_TEMPLATE_EXT}', 
                            is_templ=False),
     RepoassistFileGenEntry(src=Path(DirName.TEMPLATES) / f'{FileName.AUTHORS_PREPARED}{JINJA2_TEMPLATE_EXT}', 
-                           dst=Path('.') / DirName.REPOASSIST  / DirName.TEMPLATES / f'{FileName.AUTHORS_PREPARED}{JINJA2_TEMPLATE_EXT}', 
+                           dst=Path('.') / DirName.REPOASSIST / DirName.TEMPLATES / f'{FileName.AUTHORS_PREPARED}{JINJA2_TEMPLATE_EXT}', 
                            is_templ=False),
     RepoassistFileGenEntry(src=Path(DirName.TEMPLATES) / f'{FileName.REQUIREMENTS_DEV}{JINJA2_TEMPLATE_EXT}', 
-                           dst=Path('.') / DirName.REPOASSIST  / DirName.TEMPLATES / f'{FileName.REQUIREMENTS_DEV}{JINJA2_TEMPLATE_EXT}', 
+                           dst=Path('.') / DirName.REPOASSIST / DirName.TEMPLATES / f'{FileName.REQUIREMENTS_DEV}{JINJA2_TEMPLATE_EXT}', 
                            is_templ=False),
+    RepoassistFileGenEntry(src=Path(DirName.TEMPLATES) / f'{FileName.REPOASSIST_README}{JINJA2_TEMPLATE_EXT}', 
+                       dst=Path('.') / DirName.REPOASSIST / f'{FileName.README}', is_templ=False),
 ]
 
 GEN_REPO_CONFIG_MANDATORY_FIELDS = [

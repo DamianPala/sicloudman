@@ -44,7 +44,7 @@ def choose_one(name, msg, choices):
     
     no_choice = True
     while no_choice:
-        choice = input(f'{name}: [CHECKPOINT]: {msg} ({get_choices_string(choices)}): ')
+        choice = input(f"{name}: [CHECKPOINT]: {msg} ({'/'.join(choices)}): ")
         for item in choices:
             if item == choice:
                 no_choice = False
@@ -61,11 +61,3 @@ def is_checkpoint_ok(name, msg, choices=['y', 'n'], valid_value='y'):
     choice = choose_one(name, msg, choices)
             
     return True if choice == valid_value else False
-
-
-def get_choices_string(choices):
-    choices_string = ''
-    for choice in choices:
-        choices_string += f'{choice}/'
-        
-    return choices_string[:-1]

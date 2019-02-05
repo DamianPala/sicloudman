@@ -191,7 +191,7 @@ def get_project_module_path(config, cwd='.'):
 
 
 def get_dir_from_arg(prompt_dir):
-    return (Path().cwd() / prompt_dir).resolve()
+    return (Path().cwd() / str(prompt_dir).strip('\"')).resolve()
 
 
 def get_latest_file(path):

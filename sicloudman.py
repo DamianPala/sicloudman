@@ -121,7 +121,7 @@ class CloudManager(object):
             self.credentials_path = self.cwd / CLOUD_CREDENTIALS_FILENAME
         self.buckets_list = buckets_list
         if get_logger:
-            _logger = get_logger(__name__)
+            CloudManager._logger = get_logger(__name__)
 
         if credentials:
             if isinstance(credentials, Credentials):
