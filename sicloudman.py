@@ -244,6 +244,10 @@ class CloudManager(object):
             dir_where_to_download = self.artifacts_path
             if not dir_where_to_download.exists():
                 Path.mkdir(dir_where_to_download, parents=True)
+            else:
+                for path in dir_where_to_download.iterdir():
+                    if path.is_dir() and path.name == bucket_name:
+                        dir_where_to_download = dir_where_to_download / path.name
 
             path_where_to_download = dir_where_to_download / filename
             if path_where_to_download.exists():
@@ -306,7 +310,7 @@ class CloudManager(object):
             ftp_conn.cwd(bucket)
             bucket_files = sorted(list(ftp_conn.mlsd()), key=lambda k: k[1]['modify'])
             if bucket_files:
-                self._logger.info(f'The {bucket} bucket files:')
+                self._logger.info(f'========== The {bucket} bucket files: ==========')
                 files_list = []
                 for file in bucket_files:
                     files_list.append(file[0])

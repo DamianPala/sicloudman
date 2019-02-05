@@ -891,6 +891,39 @@ def test_download_file_SHOULD_download_file_properly(cwd):
 
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
+def test_download_file_SHOULD_download_file_properly_to_bucket_dirs(cwd):
+    bucket_paths = SimpleNamespace(
+        main_bucket_path='fw_cloud',
+        client_name='sicloudman_client',
+        project_name='sicloudman_project')
+    cloud_manager, artifacts_path = get_updated_cloud_manager(cwd, bucket_paths,
+                                                              [sicloudman.Bucket(name='release', keywords=['_release']), 
+                                                               sicloudman.Bucket(name='client', keywords=['_client'])])
+    Path(artifacts_path / 'release').mkdir()
+    Path(artifacts_path / 'client').mkdir()
+    Path(artifacts_path / 'dev').mkdir()
+    Path(artifacts_path / 'release' / 'test_1_release.txt').touch()
+    Path(artifacts_path / 'client' / 'test_1_client.txt').touch()
+    Path(artifacts_path / 'dev' / 'test_1_dev.txt').touch()
+    
+    cloud_manager.upload_artifacts(prompt=False)
+    
+    shutil.rmtree(artifacts_path)
+    Path(artifacts_path).mkdir()
+    Path(artifacts_path / 'release').mkdir()
+    Path(artifacts_path / 'client').mkdir()
+    Path(artifacts_path / 'dev').mkdir()
+
+    downloaded_file_path = cloud_manager.download_file(filename='test_1_release.txt')
+    
+    assert (artifacts_path / 'release' / 'test_1_release.txt') in set((artifacts_path / 'release').iterdir())
+    assert downloaded_file_path == (artifacts_path / 'release' / 'test_1_release.txt').as_posix()
+    
+    with ftplib.FTP(cloud_manager.credentials.server, cloud_manager.credentials.username, cloud_manager.credentials.password) as ftp_conn:
+        ftp_rmtree(ftp_conn, cloud_manager._get_project_bucket_path().parent.as_posix())
+
+
+@pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
 def test_download_file_SHOULD_not_download_file_if_already_exists(cwd, caplog):
     bucket_paths = SimpleNamespace(
         main_bucket_path='fw_cloud',

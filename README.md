@@ -55,7 +55,7 @@ All files from all buckets can be listed from your cloud sever using the `list_c
 
 ### Download File
 
-By using the `download_file` method you can download a file specified by the name to your artifacts location. When the `filename` parameter is not provided then a file name will be prompted in command line.
+By using the `download_file` method you can download a file specified by the name to your artifacts location. In the case when in an artifacts location exists directories named as buckets on the server then downloaded file will be placed directly in the first matched directory corresponding to the bucket name. When the `filename` parameter is not provided then a file name will be prompted in command line.
 
 > If a file already exists on server it will not be overwritten and an appropriate warning will be printed.
 >
