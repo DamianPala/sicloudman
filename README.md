@@ -29,7 +29,7 @@ Sicloudman has some basic features:
 
 Files on a cloud server are stored in buckets. In the case when you have multiple project configurations where different output files or builds are generated then you can automatically separate them and upload to different buckets. It means that a project configuration which produce distinguishable files regarding functionality is intended for storing in a separate bucket.
 
-Sicloudman searches specified location where your project output files are generated and automatically detects which files belongs to which buckets and upload these files into the cloud server.
+Sicloudman **searches recursively** specified location where your project output files are generated and automatically detects which files belongs to which buckets and upload these files into the cloud server.
 
 Only a latest created file belonging to the given project configuration - bucket will be uploaded.
 
@@ -55,7 +55,7 @@ All files from all buckets can be listed from your cloud sever using the `list_c
 
 ### Download File
 
-By using the `download_file` method you can download a file specified by the name to your artifacts location.
+By using the `download_file` method you can download a file specified by the name to your artifacts location. When the `filename` parameter is not provided then a file name will be prompted in command line.
 
 > If a file already exists on server it will not be overwritten and an appropriate warning will be printed.
 >
@@ -122,3 +122,4 @@ client_name =
 # Leave empty if not attached to the final path
 project_name = 
 ```
+
