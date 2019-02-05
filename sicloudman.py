@@ -276,9 +276,9 @@ class CloudManager(object):
             directory = Path(directory)
             if directory.exists() and directory.is_dir():
                 FileTime = namedtuple('FileTime', ['path', 'mtime'])
+                path_list = directory.rglob(f'**/*{keyword}*')
                 files_list = [FileTime(item, Path(item).stat().st_mtime)
-                              for item in directory.iterdir()
-                              if item.is_file() and keyword in item.name]
+                              for item in path_list if item.is_file()]
 
                 if files_list:
                     return max(files_list, key=lambda x: x.mtime).path

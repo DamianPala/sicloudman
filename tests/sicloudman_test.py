@@ -90,16 +90,16 @@ def test_get_latest_file_with_keyword_SHOULD_return_none_if_does_not_contain_fil
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
 def test_get_latest_file_with_keyword_SHOULD_get_latest_file_properly_by_extension(cwd):
-    Path(Path(cwd) / 'test1.txt').touch()
-    Path(Path(cwd) / 'test1.ini').touch()
+    (Path(cwd) / 'test1.txt').touch()
+    (Path(cwd) / 'test1.ini').touch()
     time.sleep(1)
-    Path(Path(cwd) / 'test2.txt').touch()
-    Path(Path(cwd) / 'test2.cfg').touch()
+    (Path(cwd) / 'test2.txt').touch()
+    (Path(cwd) / 'test2.cfg').touch()
     time.sleep(1)
-    Path(Path(cwd) / 'test3.txt').touch()
-    Path(Path(cwd) / 'test3.py').touch()
+    (Path(cwd) / 'test3.txt').touch()
+    (Path(cwd) / 'test3.py').touch()
     time.sleep(1)
-    Path(Path(cwd) / 'test4.py').touch()
+    (Path(cwd) / 'test4.py').touch()
     
     assert sicloudman.CloudManager.get_latest_file_with_keyword(cwd, '.txt') == Path(cwd) / 'test3.txt'
 
@@ -107,15 +107,32 @@ def test_get_latest_file_with_keyword_SHOULD_get_latest_file_properly_by_extensi
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
 def test_get_latest_file_with_keyword_SHOULD_get_latest_file_properly_by_keyword(cwd):
     
-    Path(Path(cwd) / 'test_release_1.txt').touch()
-    Path(Path(cwd) / 'test_client_1.txt').touch()
+    (Path(cwd) / 'test_release_1.txt').touch()
+    (Path(cwd) / 'test_client_1.txt').touch()
     time.sleep(1)
-    Path(Path(cwd) / 'test_release_2.txt').touch()
-    Path(Path(cwd) / 'test_client_2.txt').touch()
+    (Path(cwd) / 'test_release_2.txt').touch()
+    (Path(cwd) / 'test_client_2.txt').touch()
     time.sleep(1)
-    Path(Path(cwd) / 'test_client_3.txt').touch()
+    (Path(cwd) / 'test_client_3.txt').touch()
     
     assert sicloudman.CloudManager.get_latest_file_with_keyword(cwd, '_release') == Path(cwd) / 'test_release_2.txt'
+
+
+@pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
+def test_get_latest_file_with_keyword_SHOULD_get_latest_file_properly_by_keyword_recursively(cwd):
+    
+    (Path(cwd) / 'test_release_1.txt').touch()
+    (Path(cwd) / 'test_client_1.txt').touch()
+    time.sleep(1)
+    (Path(cwd) / 'test_release_2.txt').touch()
+    (Path(cwd) / 'test_client_2.txt').touch()
+    time.sleep(1)
+    (Path(cwd) / 'test_client_3.txt').touch()
+    time.sleep(1)
+    (Path(cwd) / 'dir').mkdir()
+    (Path(cwd) / 'dir' / 'test_release_4.txt').touch()
+    
+    assert sicloudman.CloudManager.get_latest_file_with_keyword(cwd, '_release') == Path(cwd) / 'dir' / 'test_release_4.txt'
     
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
@@ -499,6 +516,40 @@ def test_upload_artifacts_and_list_cloud_SHOULD_upload_files_to_buckets_properly
     Path(artifacts_path / 'test_2_release.txt').touch()
     Path(artifacts_path / 'test_2_client.txt').touch()
     Path(artifacts_path / 'test_2_dev.txt').touch()
+    
+    uploaded_files_paths = cloud_manager.upload_artifacts(prompt=False)
+    cloud_files = cloud_manager.list_cloud()
+    
+    assert set(cloud_files.release) == {'test_2_release.txt'}
+    assert cloud_files.release.__len__() == 1
+    assert set(cloud_files.client) == {'test_2_client.txt'}
+    assert cloud_files.client.__len__() == 1
+    assert (cloud_manager._get_project_bucket_path() / 'release' / 'test_2_release.txt').as_posix() in uploaded_files_paths
+    assert (cloud_manager._get_project_bucket_path() / 'client' / 'test_2_client.txt').as_posix() in uploaded_files_paths
+    
+    with ftplib.FTP(cloud_manager.credentials.server, cloud_manager.credentials.username, cloud_manager.credentials.password) as ftp_conn:
+        ftp_rmtree(ftp_conn, cloud_manager._get_project_bucket_path().parent.as_posix())
+
+
+@pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
+def test_upload_artifacts_and_list_cloud_SHOULD_upload_files_to_buckets_recursively_properly_and_list(cwd):
+    bucket_paths = SimpleNamespace(
+        main_bucket_path='fw_cloud',
+        client_name='sicloudman_client',
+        project_name='sicloudman_project')
+    cloud_manager, artifacts_path = get_updated_cloud_manager(cwd, bucket_paths,
+                                                              [sicloudman.Bucket(name='release', keywords=['_release']), 
+                                                               sicloudman.Bucket(name='client', keywords=['_client'])])
+    Path(artifacts_path / 'release').mkdir()
+    Path(artifacts_path / 'client').mkdir()
+    Path(artifacts_path / 'dev').mkdir()
+    Path(artifacts_path / 'release' / 'test_1_release.txt').touch()
+    Path(artifacts_path / 'client' / 'test_1_client.txt').touch()
+    Path(artifacts_path / 'dev' / 'test_1_dev.txt').touch()
+    time.sleep(1)
+    Path(artifacts_path / 'release' / 'test_2_release.txt').touch()
+    Path(artifacts_path / 'client' / 'test_2_client.txt').touch()
+    Path(artifacts_path / 'dev' / 'test_2_dev.txt').touch()
     
     uploaded_files_paths = cloud_manager.upload_artifacts(prompt=False)
     cloud_files = cloud_manager.list_cloud()
