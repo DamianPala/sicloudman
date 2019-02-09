@@ -65,6 +65,10 @@ class CredentialsError(SiCloudManError):
     pass
 
 
+class CredentialsNotFoundError(SiCloudManError):
+    pass
+
+
 class FtpError(SiCloudManError):
     pass
 
@@ -79,6 +83,16 @@ def handle_ftplib_error(func):
             passed = {k: v for k, v in zip(arg_names[:len(args)], args)}
             self = passed['self']
             raise FtpError(f'Ftp error occured: {e}', self._logger)
+
+    return wrapper
+
+
+def check_credentials(func):
+    def wrapper(*args, **kwargs):
+        if args[0].credentials is None:
+            raise CredentialsNotFoundError(f'{CLOUD_CREDENTIALS_FILENAME} file not found!', args[0]._logger)
+        else:
+            return func(*args, **kwargs)
 
     return wrapper
 
@@ -140,6 +154,7 @@ class CloudManager(object):
 
         return file_path
 
+    @check_credentials
     @handle_ftplib_error
     def upload_artifacts(self, prompt=True):
         self._logger.info('Upload files to the cloud server...')
@@ -170,6 +185,7 @@ class CloudManager(object):
 
         return uploaded_files
 
+    @check_credentials
     @handle_ftplib_error
     def upload_file(self, file_path=None, bucket_name=None, prompt=True):
         self._logger.info('Upload specified file to the cloud server...')
@@ -199,6 +215,7 @@ class CloudManager(object):
 
             return (Path(ftp_conn.pwd()) / file_path.name).as_posix()
 
+    @check_credentials
     @handle_ftplib_error
     def list_cloud(self):
         self._logger.info('List cloud buckets...')
@@ -219,6 +236,7 @@ class CloudManager(object):
                 return cloud_files
         return None
 
+    @check_credentials
     @handle_ftplib_error
     def download_file(self, filename=None):
         self._logger.info('Download a specified file from the cloud server...')
@@ -280,7 +298,7 @@ class CloudManager(object):
             directory = Path(directory)
             if directory.exists() and directory.is_dir():
                 FileTime = namedtuple('FileTime', ['path', 'mtime'])
-                path_list = directory.rglob(f'**/*{keyword}*')
+                path_list = directory.rglob(f'*{keyword}*')
                 files_list = [FileTime(item, Path(item).stat().st_mtime)
                               for item in path_list if item.is_file()]
 
@@ -328,7 +346,7 @@ class CloudManager(object):
 
     def _read_cloud_credentials(self):
         if not self.credentials_path.exists():
-            raise FileNotFoundError(f'{self.credentials_path} file not found!', self._logger)
+            return None
 
         properties_string = f'[dummy_section]\n{self.credentials_path.read_text()}'
 
@@ -347,6 +365,7 @@ class CloudManager(object):
 
         return Credentials(**credentials_dict)
 
+    @check_credentials
     def _get_project_bucket_path(self):
         path = Path('/') / self.credentials.main_bucket_path
         if self.credentials.client_name:
