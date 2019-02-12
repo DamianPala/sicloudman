@@ -168,6 +168,7 @@ def test_touch_and_read_credentials_WHEN_keywords(cwd):
     
     cloud_manager = sicloudman.CloudManager('artifacts',
                                             [sicloudman.Bucket(name='release', keywords=['_release'])], cwd=cwd)
+    cloud_manager._get_project_bucket_path()
     pprint(cloud_manager.credentials.__dict__)
     
     assert set(cloud_manager.credentials.__dict__) ==  set(credentials_expected.__dict__)
@@ -186,7 +187,8 @@ def test_read_credentials_SHOULD_rise_error_when_mandatory_field_empty(cwd):
     sicloudman.CloudManager.touch_credentials(cwd, keywords=credentials_expected.__dict__)
     
     with pytest.raises(sicloudman.CredentialsError): 
-        sicloudman.CloudManager('artifacts', [sicloudman.Bucket(name='release', keywords=['_release'])], cwd=cwd)
+        cloud_manager = sicloudman.CloudManager('artifacts', [sicloudman.Bucket(name='release', keywords=['_release'])], cwd=cwd)
+        cloud_manager._get_project_bucket_path()
 
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
@@ -202,7 +204,8 @@ def test_read_credentials_SHOULD_rise_error_when_field_has_invalid_value(cwd):
     sicloudman.CloudManager.touch_credentials(cwd, keywords=credentials_expected.__dict__)
     
     with pytest.raises(sicloudman.CredentialsError): 
-        sicloudman.CloudManager('artifacts', [sicloudman.Bucket(name='release', keywords=['_release'])], cwd=cwd)
+        cloud_manager = sicloudman.CloudManager('artifacts', [sicloudman.Bucket(name='release', keywords=['_release'])], cwd=cwd)
+        cloud_manager._get_project_bucket_path()
 
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
@@ -219,6 +222,7 @@ def test_read_credentials_SHOULD_not_rise_error_when_extra_field_empty(cwd):
     
     cloud_manager = sicloudman.CloudManager('artifacts',
                                             [sicloudman.Bucket(name='release', keywords=['_release'])], cwd=cwd)
+    cloud_manager._get_project_bucket_path()
     
     assert set(cloud_manager.credentials.__dict__) ==  set(credentials_expected.__dict__)
 
@@ -328,6 +332,23 @@ def test_check_credentials_SHOULD_not_raise_error_WHEN_credentials_file(cwd):
         cloud_manager._get_project_bucket_path()
     except Exception as e:
         assert 0, f'Unexpected error occured: {e}'
+
+
+@pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
+def test_check_credentials_SHOULD_not_raise_error_WHEN_credentials_file_is_empty_AND_only_CloudManager_init(cwd):
+    sicloudman.CloudManager.touch_credentials(cwd, keywords=sicloudman.Credentials(
+        server='my_server',
+        username='user',
+        password='pass',
+        main_bucket_path='main_bucket',
+        client_name='client',
+        project_name='',
+    ).__dict__)
+    try:
+        sicloudman.CloudManager('artifacts',
+                                [sicloudman.Bucket(name='release', keywords=['_release'])], cwd=cwd)
+    except Exception as e:
+        assert 0, f'Unexpected error occured: {e}'
     
 
 @pytest.mark.skipif(RUN_ALL_TESTS == False, reason='Skipped on demand')
@@ -383,11 +404,13 @@ def test_is_path_exists_SHOULD_return_false_if_not_exists(cwd):
     cloud_manager = sicloudman.CloudManager('artifacts',
                                             [sicloudman.Bucket(name='release', keywords=['_release'])], 
                                             credentials_path=TEST_CLOUD_CREDENTIALS_PATH, cwd=cwd)
+    cloud_manager._get_project_bucket_path()
     credentials = copy.copy(cloud_manager.credentials)
     credentials.client_name = 'this_is_abstrac_client_path_173'
     sicloudman.CloudManager.touch_credentials(cwd, keywords=credentials.__dict__)
     cloud_manager = sicloudman.CloudManager('artifacts',
                                             [sicloudman.Bucket(name='release', keywords=['_release'])], cwd=cwd)
+    cloud_manager._get_project_bucket_path()
     
     with ftplib.FTP(cloud_manager.credentials.server, cloud_manager.credentials.username, cloud_manager.credentials.password) as ftp_conn:
         project_bucket_path = cloud_manager._get_project_bucket_path()
@@ -400,11 +423,14 @@ def test_is_path_exists_SHOULD_return_true_if_exists(cwd):
     cloud_manager = sicloudman.CloudManager('artifacts',
                                             [sicloudman.Bucket(name='release', keywords=['_release'])], 
                                             credentials_path=TEST_CLOUD_CREDENTIALS_PATH, cwd=cwd)
+    cloud_manager._get_project_bucket_path()
+    
     credentials = copy.copy(cloud_manager.credentials)
     credentials.client_name = 'this_is_abstrac_client_path_173'
     sicloudman.CloudManager.touch_credentials(cwd, keywords=credentials.__dict__)
     cloud_manager = sicloudman.CloudManager('artifacts',
                                             [sicloudman.Bucket(name='release', keywords=['_release'])], cwd=cwd)
+    cloud_manager._get_project_bucket_path()
     
     with ftplib.FTP(cloud_manager.credentials.server, cloud_manager.credentials.username, cloud_manager.credentials.password) as ftp_conn:
         project_bucket_path = cloud_manager._get_project_bucket_path()
@@ -428,12 +454,14 @@ def get_updated_cloud_manager(cwd, bucket_paths, buckets):
     cloud_manager = sicloudman.CloudManager(artifacts_path,
                                             [sicloudman.Bucket(name='release', keywords=['_release'])], 
                                             credentials_path=TEST_CLOUD_CREDENTIALS_PATH, cwd=cwd)
+    cloud_manager._get_project_bucket_path()
     credentials = copy.copy(cloud_manager.credentials)
     credentials.main_bucket_path = bucket_paths.main_bucket_path
     credentials.client_name = bucket_paths.client_name
     credentials.project_name = bucket_paths.project_name
     sicloudman.CloudManager.touch_credentials(cwd, keywords=credentials.__dict__)
     cloud_manager = sicloudman.CloudManager(artifacts_path, buckets, cwd=cwd)
+    cloud_manager._get_project_bucket_path()
     
     with ftplib.FTP(cloud_manager.credentials.server, cloud_manager.credentials.username, cloud_manager.credentials.password) as ftp_conn:
         main_bucket_path = cloud_manager.credentials.main_bucket_path

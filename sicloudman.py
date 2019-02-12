@@ -89,10 +89,13 @@ def handle_ftplib_error(func):
 
 def check_credentials(func):
     def wrapper(*args, **kwargs):
-        if args[0].credentials is None:
-            raise CredentialsNotFoundError(f'{CLOUD_CREDENTIALS_FILENAME} file not found!', args[0]._logger)
-        else:
-            return func(*args, **kwargs)
+        self = args[0]
+        if self.credentials is None:
+            self.credentials = self._read_cloud_credentials()
+            if self.credentials is None:
+                raise CredentialsNotFoundError(f'{CLOUD_CREDENTIALS_FILENAME} file not found!', self._logger)
+
+        return func(*args, **kwargs)
 
     return wrapper
 
@@ -143,7 +146,7 @@ class CloudManager(object):
             else:
                 raise TypeError('credentials parameter is not an instance of Credentials class', self._logger)
         else:
-            self.credentials = self._read_cloud_credentials()
+            self.credentials = None
 
     @staticmethod
     def touch_credentials(path, keywords={}):
